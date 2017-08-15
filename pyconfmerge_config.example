@@ -1,0 +1,108 @@
+#!/usr/bin/env python
+# -*-  coding: utf-8  -*-
+#
+# This is the configuration file for the pyconfmerge tool.  It controls
+# how pyconfmerge will handle the merging of configuration files like
+# this one.
+#
+
+# Colors for display on command line
+colors = {
+    'template' : 'green',
+    'config': 'blue',
+    'prompt': 'default'
+}
+
+# How comments should be handled for interactive mode.
+# The comments will be shown to the user in interactive mode depending
+# on the show_* flags
+comments = {
+    'show_template_comments_before_prompt': True,
+    'show_config_comments_before_prompt': False,
+    }
+
+# These functions are used to define what action to take when a top level
+# statement in the template and config files are compared and found to differ.
+# The function should return 'template', 'config', or 'neither' to say
+# which value should be merged by default.  The arguments to the function
+# are the identifier (for definitions and assignments) and the syntax nodes
+# from the parsed version of each file (see RedBaron).
+# The identifier is a string extracted from the 'target' or 'name' of the
+# assignment or definition.
+# When no corresponding item can be found in one of the parse trees,
+# the template_val or config_val will be None (but not both).  For
+# example an assignment to a variable not found in the other file, or a
+# comment not found in the other file.
+def config_val_if_same_type(id, template_val, config_val):
+    return 'config' if (template_val is None or 
+                        (config_val is not None and 
+                         template_val.type == config_val.type)) else 'template'
+
+def config_val_if_defined(id, template_val, config_val):
+    return 'config' if config_val is not None else 'template'
+
+def template_val_if_defined(id, template_val, config_val):
+    return 'template' if template_val is not None else 'config'
+
+def always_template(id, template_val, config_val):
+    return 'template'
+
+def always_config(id, template_val, config_val):
+    return 'config'
+
+# This dictionary defines what to do with each type of top level element
+# in the template and config file.  Settings files typically have
+# assignments and definitions interspersed with comments.
+# The node type names come from RedBaron.
+# The default action to take is stored in the 'DEFAULT' entry of this
+# dictionary. Any node type not found in this dictionary is processed
+# with the default action.
+merge_rules = {
+    'assignment': config_val_if_same_type,
+    'def': config_val_if_defined,
+    'class': config_val_if_defined,
+    'comment' : config_val_if_defined,
+    'space': config_val_if_defined,
+    'DEFAULT': config_val_if_defined
+}
+
+# These are the interactive prompts users will see.
+# They are grouped by localization code.
+prompts = {
+    'EN' : {
+        'prefix': '=*=>\t',
+        'config_file': 'config file',
+        'template_file': 'template file',
+        'merged_file': 'merged file',
+        'config_value': 'Value from config',
+        'template_value': 'Value from template',
+        'choices': ['template', 'config', 'neither'],
+        'keep': 'Keep',
+        'instructions': """
+Type the first letter of one the {choices}, or Return to choose the
+default (capitalized) option""",
+        'comments': 'Comments from',
+        'processing': 'Processing {template_file} ...',
+        'values_agree': 'Values for "{identifier}" agree',
+        'values_disagree': 'Values for "{identifier}" do not agree',
+        'output_exists': 'Will not overwrite {output_file}.  Skipping {template_file}...',
+        },
+    'FR' : {
+        'prefix': '=*=>\t',
+        'config_file': 'fichier config',
+        'template_file': 'fichier modèle',
+        'merged_file': 'fichier de sortie',
+        'config_value': 'Valeur du config',
+        'template_value': 'Valeur du modèle',
+        'choices': ['modèle', 'config', 'aucun'],
+        'keep': 'Garder',
+        'instructions': """
+Tapez la première lettre parmi les choix {choices}, soit Return pour choisir
+le défaut (en majuscules)""",
+        'comments': 'Commentaire du',
+        'processing': 'Traitement de {template_file} ...',
+        'values_agree': "Valeurs pour «{identifier}» sont en accord",
+        'values_disagree': "Valeurs pour «{identifier}» ne sont pas d'accord",
+        'output_exists': 'Ne pas écrasant {output_file}.  Passe {template_file}...',
+        }
+}
