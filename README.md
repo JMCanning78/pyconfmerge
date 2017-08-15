@@ -18,8 +18,8 @@ config file template.  This can be very complex, especially for people
 not familiar with Python programming or source code merge tools.
 
 Enter pyconfmerge.  This tool is designed to merge Python files to
-preserve the structure of the configuation template while merging in
-the values of an existing configuation file.  It can be run automatically
+preserve the structure of the configuration template while merging in
+the values of an existing configuration file.  It can be run automatically
 or interactively to produce new configuration files.  It looks for
 assignments or definitions in the templates and config files, and
 preserves the customized values where possible.
