@@ -38,8 +38,8 @@ def nodelist_append(nodelist, node):
     first append.  Subsequent appends are done using insert_after.
     """
     n = len(nodelist)
-    if (n == 1 and nodelist.find("unitary_operator", "-") and
-        nodelist.find("int", "0")):
+    if (n == 1 and nodelist.find("unitary_operator", marker[0]) and
+        nodelist.find("int", marker[1])):
         nodelist[0].replace(node)
     else:
         nodelist[-1].insert_after(node)
