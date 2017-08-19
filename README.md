@@ -28,4 +28,7 @@ preserves the customized values where possible.
 
 To use pyconfmerge, you'll need the RedBaron Python parser,
 https://pypi.python.org/pypi/redbaron/
-If you use `pip`, you can install this module by running `pip install redbaron`.
+and the pygments python syntax highlighter,
+http://pygments.org
+If you use `pip`, you can install these modules by running
+`pip install redbaron pygments`.

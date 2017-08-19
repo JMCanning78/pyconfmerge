@@ -8,6 +8,8 @@ from __future__ import print_function
 # See https://github.com/JMCanning78/pyconfmerge for full details.
 
 from redbaron import RedBaron, base_nodes
+import pygments
+from pygments.lexers import PythonLexer
 
 import argparse, os, sys, readline, operator
 from glob import glob
@@ -76,28 +78,28 @@ def choose_action(id, t_nodes, c_nodes, t_comments, c_comments, default_action,
             options['prompts']['comments'], options['prompts']['template_file'])
         iprint(msg, options)
         for line in [ t.value for t in t_comments ]:
-            print(line)
+            print_python_content(line, options)
         sep = ''
     if (len(c_comments) > 0 and options['comments'][
             'show_config_comments_before_prompt'] and
         (not options['comments']['show_template_comments_before_prompt'] or
          str(c_comments) != str(t_comments))):
-        print(sep)
+        iprint(sep, options)
         msg = "{0} {1}:".format(
             options['prompts']['comments'], options['prompts']['config_file'])
         iprint(msg, options)
         for line in [ c.value for c in c_comments ]:
-            print(line)
+            print_python_content(line, options)
         sep = ''
     if sep:
-        print(sep)
+        iprint(sep, options)
     iprint('values_disagree', options)
     msg = '{0}: '.format(options['prompts']['template_value'])
     iprint(msg, options)
-    print(t_nodes)
+    print_python_content(t_nodes, options)
     msg = '{0}: '.format(options['prompts']['config_value'])
     iprint(msg, options)
-    print(c_nodes)
+    print_python_content(c_nodes, options)
 
     formatted_choices = [
         choices[i].capitalize() if i == default_index else choices[i]
@@ -116,7 +118,8 @@ def choose_action(id, t_nodes, c_nodes, t_comments, c_comments, default_action,
             default_index = choice_chars.find(resp[0].lower())
             resp = resp[0]
         else:
-            iprint('Unrecognized option, "{0}"'.format(resp), options)
+            iprint('{0} "{1}"'.format(options['prompts']['unrecognized_option'],
+                                      resp), options)
     return output_choices[default_index]
 
 def iprint (msg_or_key, options, prompt=False, file=sys.stdout):
@@ -134,6 +137,10 @@ def iprint (msg_or_key, options, prompt=False, file=sys.stdout):
     else:
         print(prefix + msg_or_key.format(**options), file=file)
         file.flush()
+
+def print_python_content(text, options, file=sys.stdout):
+    pygments.highlight(str(text), PythonLexer(), 
+                       pyconfmerge_config.textFormatter, file)
 
 def parse_py_config(text):
     """Parse text as Python config file.  This is basically the same as
@@ -184,11 +191,11 @@ def process_nodes_pair(
     """
     t_nodes = None if t0 < 0 else t_FST[t0:t1]
     c_nodes = None if c0 < 0 else c_FST[c0:c1]
-    node_type = t_nodes[0].type if t_nodes is not None else c_nodes[0].type
+    node_type = t_FST[t0].type if t_nodes is not None else c_FST[c0].type
     rule = options['merge_rules'].get(node_type,
                                       options['merge_rules']['DEFAULT'])
-    action = apply(rule, (id, t_nodes[0] if t_nodes else None,
-                          c_nodes[0] if c_nodes else None))
+    action = apply(rule, (id, t_FST[t0] if t_nodes else None,
+                          c_FST[c0] if c_nodes else None))
     if options['interactive']:
         action = choose_action(id, t_nodes, c_nodes, t_FST[tnci+1:max(t0,0)],
                                c_FST[cnci+1:max(c0,0)], action, options)
@@ -208,42 +215,46 @@ def process_nodes_pair(
         raise Exception('Unexpected action code "{0}" in rule for {1} nodes'
                         .format(action, node_type))
     elif options['verbose'] > 3:
-        iprint('Neither template nor config copied to merged version', options)
+        iprint('neither_copied', options)
 
 def find_node(node, FST, start, only_within=text_node_types):
     """Find the next matching node from one FST in another starting at a
     particular index.  If the type of the node is among the
     only_within types, only search among the next nodes of that type,
     otherwise search all remaining nodes.
+    For assignment/defintion nodes, find the next assignment/definition
+    with a matching identifier, regardless of whether the values match.
     """
     node_within = node.type in only_within
     node_id = identifier(node)
     for i in range(start, len(FST)):
         if node.type == FST[i].type and (
-                node.value == FST[i].value or
+                str(node.value) == str(FST[i].value) or
                 (node_id is not None and node_id == identifier(FST[i]))):
             return i
         if node_within and FST[i].type not in only_within:
             return -1
-    return i if i < len(FST) else -1
+    return -1
     
 def merge_python_FST(templ_FST, config_FST, options):
-    """Merge two parsed Pythhon files based on the Full Syntax Trees"""
+    """Merge two parsed Python files based on the Full Syntax Trees"""
     ti = 0
     tnci = -1
     ci = 0
     cnci = -1
     merged = RedBaron(marker)
     while ti < len(templ_FST) or ci < len(config_FST):
+        # For comments and text node types, group them into contiguous
+        # blocks of text nodes
         for t1 in range(ti+1, len(templ_FST) + 1):
             if (templ_FST[ti].type not in text_node_types or
                 t1 >= len(templ_FST) or
                 templ_FST[t1].type not in text_node_types):
                 break
         for c1 in range(ci+1, len(config_FST) + 1):
-            if (templ_FST[ci].type not in text_node_types or
+            if (config_FST[ci].type not in text_node_types or
                 c1 >= len(config_FST) or
-                templ_FST[c1].type not in text_node_types):
+                config_FST[c1].type not in text_node_types):
                 break
         if ti < len(templ_FST):
             if ci < len(config_FST):
@@ -258,11 +269,16 @@ def merge_python_FST(templ_FST, config_FST, options):
                     process_nodes_pair(merged, identifier(templ_FST[ti]),
                                        templ_FST, tnci, ti, t1,
                                        config_FST, cnci, -1, c1, options)
-                elif tmi > ci:
+                elif tmi > ci or templ_FST[ti].type in text_node_types:
                     t1 = ti
-                    process_nodes_pair(merged, identifier(templ_FST[ti]),
+                    process_nodes_pair(merged, identifier(config_FST[ci]),
                                        templ_FST, tnci, -1, t1,
                                        config_FST, cnci, ci, c1, options)
+                else:
+                    c1 = ci
+                    process_nodes_pair(merged, identifier(templ_FST[ti]),
+                                       templ_FST, tnci, ti, t1,
+                                       config_FST, cnci, -1, c1, options)
             else:
                 c1 = ci
                 process_nodes_pair(merged, identifier(templ_FST[ti]),
@@ -270,7 +286,7 @@ def merge_python_FST(templ_FST, config_FST, options):
                                    config_FST, cnci, -1, c1, options)
         else:
             t1 = ti
-            process_nodes_pair(merged, identifier(templ_FST[ti]),
+            process_nodes_pair(merged, identifier(config_FST[ci]),
                                templ_FST, tnci, -1, t1,
                                config_FST, cnci, ci, c1, options)
         # Track the last non-comment expression in both FSTs

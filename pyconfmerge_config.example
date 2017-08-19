@@ -7,11 +7,41 @@
 #
 
 # Colors for display on command line
-colors = {
-    'template' : 'green',
-    'config': 'blue',
-    'prompt': 'default'
-}
+from pygments.formatters import TerminalFormatter
+from pygments.token import *
+textFormatter = TerminalFormatter(
+    bg='light', 
+    colorstyle={
+        Token:              ('',            ''),
+        
+        Whitespace:         ('lightgray',   'darkgray'),
+        Comment:            ('lightgray',   'darkgray'),
+        Comment.Preproc:    ('teal',        'turquoise'),
+        Keyword:            ('darkblue',    'blue'),
+        Keyword.Type:       ('teal',        'turquoise'),
+        Operator.Word:      ('purple',      'fuchsia'),
+        Name.Builtin:       ('teal',        'turquoise'),
+        Name.Function:      ('darkgreen',   'green'),
+        Name.Namespace:     ('_teal_',      '_turquoise_'),
+        Name.Class:         ('_darkgreen_', '_green_'),
+        Name.Exception:     ('teal',        'turquoise'),
+        Name.Decorator:     ('darkgray',    'lightgray'),
+        Name.Variable:      ('darkred',     'red'),
+        Name.Constant:      ('darkred',     'red'),
+        Name.Attribute:     ('teal',        'turquoise'),
+        Name.Tag:           ('blue',        'blue'),
+        String:             ('brown',       'brown'),
+        Number:             ('darkblue',    'blue'),
+
+        Generic.Deleted:    ('red',        'red'),
+        Generic.Inserted:   ('darkgreen',  'green'),
+        Generic.Heading:    ('**',         '**'),
+        Generic.Subheading: ('*purple*',   '*fuchsia*'),
+        Generic.Prompt:     ('**',         '**'),
+        Generic.Error:      ('red',        'red'),
+        
+        Error:              ('_red_',      '_red_'),
+    })
 
 # How comments should be handled for interactive mode.
 # The comments will be shown to the user in interactive mode depending
@@ -77,6 +107,7 @@ prompts = {
         'config_value': 'Value from config',
         'template_value': 'Value from template',
         'choices': ['template', 'config', 'neither'],
+        'unrecognized_option': 'Unrecognized option,',
         'keep': 'Keep',
         'instructions': """
 Type the first letter of one the {choices}, or Return to choose the
@@ -86,6 +117,7 @@ default (capitalized) option""",
         'values_agree': 'Values for "{identifier}" agree',
         'values_disagree': 'Values for "{identifier}" do not agree',
         'output_exists': 'Will not overwrite {output_file}.  Skipping {template_file}...',
+        'neither_copied': 'Neither template nor config copied to merged version',
         },
     'FR' : {
         'prefix': '=*=>\t',
@@ -95,6 +127,7 @@ default (capitalized) option""",
         'config_value': 'Valeur du config',
         'template_value': 'Valeur du modèle',
         'choices': ['modèle', 'config', 'aucun'],
+        'unrecognized_option': 'Réponse inconnue,',
         'keep': 'Garder',
         'instructions': """
 Tapez la première lettre parmi les choix {choices}, soit Return pour choisir
@@ -104,5 +137,6 @@ le défaut (en majuscules)""",
         'values_agree': "Valeurs pour «{identifier}» sont en accord",
         'values_disagree': "Valeurs pour «{identifier}» ne sont pas d'accord",
         'output_exists': 'Ne pas écrasant {output_file}.  Passe {template_file}...',
+        'neither_copied': 'Ni modèle, ni config a été écrit au fichier de sortie',
         }
 }
