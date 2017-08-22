@@ -10,9 +10,15 @@ from __future__ import print_function
 from redbaron import RedBaron, base_nodes
 import pygments
 from pygments.lexers import PythonLexer
+from pygments.lexer import RegexLexer
+from pygments.token import *
+import pygments.console
+from difflib import *
 
 import argparse, os, sys, readline, operator
 from glob import glob
+if sys.version_info[0] > 2:
+    from functools import *
 
 import pyconfmerge_config
 
@@ -94,12 +100,20 @@ def choose_action(id, t_nodes, c_nodes, t_comments, c_comments, default_action,
     if sep:
         iprint(sep, options)
     iprint('values_disagree', options)
-    msg = '{0}: '.format(options['prompts']['template_value'])
-    iprint(msg, options)
-    print_python_content(t_nodes, options)
-    msg = '{0}: '.format(options['prompts']['config_value'])
-    iprint(msg, options)
-    print_python_content(c_nodes, options)
+    if t_nodes and c_nodes:
+        cdiff = list(context_diff(
+            nodes_to_lines(t_nodes), nodes_to_lines(c_nodes),
+            fromfile=options['prompts']['template_value'],
+            tofile=options['prompts']['config_value'], 
+            n=options['contextlines']))
+        print_python_content(cdiff, options, lexer=ContextDiffLexer)
+    else:
+        msg = '{0}: '.format(options['prompts']['template_value'])
+        iprint(msg, options)
+        print_python_content(t_nodes, options)
+        msg = '{0}: '.format(options['prompts']['config_value'])
+        iprint(msg, options)
+        print_python_content(c_nodes, options)
 
     formatted_choices = [
         choices[i].capitalize() if i == default_index else choices[i]
@@ -122,6 +136,15 @@ def choose_action(id, t_nodes, c_nodes, t_comments, c_comments, default_action,
                                       resp), options)
     return output_choices[default_index]
 
+def nodes_to_lines(nodelist):
+    return reduce(operator.add, map(node_to_lines, nodelist))
+
+def node_to_lines(node):
+    lines = str(node).split('\n')
+    n = len(lines)
+    return [ lines[i] if i == n - 1 else lines[i] + '\n'
+             for i in range(n) if i < n - 1 or len(lines[i]) > 0]
+    
 def iprint (msg_or_key, options, prompt=False, file=sys.stdout):
     """Print a msg on the given file, filling in values from the options
     dictionary and adding a distinguishing prefix.  If prompt is true,
@@ -138,9 +161,35 @@ def iprint (msg_or_key, options, prompt=False, file=sys.stdout):
         print(prefix + msg_or_key.format(**options), file=file)
         file.flush()
 
-def print_python_content(text, options, file=sys.stdout):
-    pygments.highlight(str(text), PythonLexer(), 
-                       pyconfmerge_config.textFormatter, file)
+# Add reverse video to the possible text formatting options
+pygments.console.codes['reverse'] = pygments.console.esc + '07m'
+
+# Define how to parse context diff results and apply token labels for pygments
+class ContextDiffLexer(RegexLexer):
+    name = 'ContextDiff'
+    aliases = ['contextdiff']
+    filenames = ['*.diff']
+
+    tokens = {
+        'root': [
+            (r' .*\n', Text),
+            (r'\*\*\* .*\n', Generic.Heading),
+            (r'--- .*\n', Generic.Subheading),
+            (r'\+ .*\n', Generic.Inserted),
+            (r'- .*\n', Generic.Deleted),
+            (r'@.*\n', Generic.Prompt),
+            (r'Index.*\n', Generic.Prompt),
+            (r'=.*\n', Generic.Prompt),
+            (r'.*\n', Text),
+        ]
+    }
+    
+def print_python_content(text, options, lexer=PythonLexer, file=sys.stdout):
+    if text:
+        pygments.highlight(
+            ''.join(text) if isinstance(text, list) and isinstance(text[0], str)
+            else ''.join(map(str, text)),
+            lexer(), pyconfmerge_config.textFormatter, file)
 
 def parse_py_config(text):
     """Parse text as Python config file.  This is basically the same as
@@ -310,7 +359,8 @@ def merge_python_files(
     with open(templ_filename) as tfile:
         try:
             if options['verbose'] > 1:
-                iprint('Parsing {0}'.format(templ_filename), options)
+                iprint('{0} {1}'.format(options['prompts']['parsing'],
+                                        templ_filename), options)
             ttree = parse_py_config(tfile.read())
         except Exception, e:
             print('Error during read or parsing of {0}'.format(
@@ -320,7 +370,8 @@ def merge_python_files(
         with open(config_filename) as cfile:
             try:
                 if options['verbose'] > 1:
-                    iprint('Parsing {0}'.format(config_filename), options)
+                    iprint('{0} {1}'.format(options['prompts']['parsing'],
+                                            config_filename), options)
                 ctree = parse_py_config(cfile.read())
             except Exception, e:
                 print('Error during read or parsing of {0}'.format(
@@ -359,6 +410,9 @@ if __name__ == '__main__':
         '-l', '--locale', default='EN', 
         choices=pyconfmerge_config.prompts.keys(),
         help='Locale for prompt language')
+    parser.add_argument(
+        '-n', '--contextlines', type=int, default=6,
+        help='Number of context lines to keep around differences in values')
     parser.add_argument(
         '-f', '--force', default=False, action='store_true',
         help='Overwrite output files if they exist')
